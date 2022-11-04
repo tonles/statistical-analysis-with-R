@@ -1,0 +1,500 @@
+---
+title: "Multivariate_analysis_PCA_MCA"
+author: "Luca Salvino"
+date: '2022-11-04'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r message=FALSE}
+library(labstatR)
+library(ggplot2)
+library(car)
+library(FactoMineR)
+library(dplyr)
+```
+
+# ANALISI MONOVARIATA
+
+Importo il dataset:
+
+```{r}
+biblio <- read.table("Biblio.txt", header = T, sep = "\t")
+```
+
+Esamino il dataset:
+
+```{r}
+biblio[1:10,]
+str(biblio)
+table(biblio$TIPO) # dicotomica
+table(biblio$MONOMULTI) # dicotomica
+```
+
+Vediamo che le variabili dalla 1 alla 4 e dalla 16 alla 22 sono di tipo qualitativo nominale, in particolare tra queste abbiamo che le variabili 2, 4, 16, 17, 18, 19, 20, 21, 22 sono dicotomiche qualitative. Le variabili qualitative nominali le indichiamo come fattori, in modo da evidenziare le diverse categorie assunte dalla variabile e poterle trattare senza problemi nell’analisi statistica.
+
+```{r}
+biblio$REGIONE <- factor(biblio$REGIONE)
+biblio$TIPO <- factor(biblio$TIPO)
+biblio$FUNZIONE <- factor(biblio$FUNZIONE)
+biblio$MONOMULTI <- factor(biblio$MONOMULTI)
+biblio$DIGITAL_AFT <- factor(biblio$DIGITAL_AFT)
+biblio$PIATDIG_AFT <- factor(biblio$PIATDIG_AFT)
+biblio$LABO_AFT <- factor(biblio$LABO_AFT)
+biblio$ONLINE_AFT <- factor(biblio$ONLINE_AFT)
+biblio$SOCIAL_AFT <- factor(biblio$SOCIAL_AFT)
+biblio$ACCESSO_AFT <- factor(biblio$ACCESSO_AFT)
+biblio$PRESTITO_AFT <- factor(biblio$PRESTITO_AFT)
+```
+
+**NOTA**: avendo a disposizione la legenda delle variabili presenti nel dataset, ed essendo queste nominate in maniera piuttosto chiara e coerente, lascio inalterati i nomi delle colonne.
+
+Utilizzando la funzione summary otteniamo informazioni relative agli indici di posizione delle variabili quantitative e la distribuzione di frequenze per le variabili qualitative (grazie alla precedente dichiarazione di tali variabili come fattori)
+
+```{r}
+summary(biblio)
+```
+
+Tuttavia, gli indici di posizione da soli non sono sufficienti per un’analisi monovariata, ma vanno considerate anche la variabilità e la forma della distribuzione. Inizio quindi a calcolare la deviazione standard (soltanto per le variabili quantitative):
+
+```{r}
+dev_std <- list("non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile", round(sd(biblio$OPENGG), 2), 
+                round(sd(biblio$UTENTIATT_TOT), 2), round(sd(biblio$PATRIMONIO_TOT), 2), round(sd(biblio$PINT_BEF), 2), 
+                round(sd(biblio$PINT_AFT), 2), round(sd(biblio$PEST_BEF), 2), round(sd(biblio$PEST_AFT), 2), 
+                round(sd(biblio$CONSUL_BEF), 2), round(sd(biblio$CONSUL_AFT), 2), round(sd(biblio$VOL_BEF), 2), 
+                round(sd(biblio$TIRO_BEF), 2), "non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile",
+                "non calcolabile", "non calcolabile", "non calcolabile")
+
+biblio <- as.data.frame(biblio)
+sunto <- as.table(summary(biblio))
+sunto <- rbind(sunto, paste("StanDev:", dev_std[]))
+sunto
+```
+
+Calcolo quindi il coefficiente di variazione, in modo da avere un’idea della variabilità delle variabili quantitative in gioco:
+
+```{r}
+CV <- list("non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile", round(cv(biblio$OPENGG), 2), 
+           round(cv(biblio$UTENTIATT_TOT), 2), round(cv(biblio$PATRIMONIO_TOT), 2), round(cv(biblio$PINT_BEF), 2), 
+           round(cv(biblio$PINT_AFT), 2), round(cv(biblio$PEST_BEF), 2), round(cv(biblio$PEST_AFT), 2), 
+           round(cv(biblio$CONSUL_BEF), 2), round(cv(biblio$CONSUL_AFT), 2), round(cv(biblio$VOL_BEF), 2), 
+           round(cv(biblio$TIRO_BEF), 2), "non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile",
+           "non calcolabile", "non calcolabile", "non calcolabile")
+sunto <- rbind(sunto, paste("CV:", CV[]))
+sunto
+```
+
+Relativamente alla forma della distribuzione, passo a calcolare gli indici di forma (asimmetria e curtosi):
+
+```{r}
+curtosi <- list("non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile", round(kurt(biblio$OPENGG), 2), 
+                round(kurt(biblio$UTENTIATT_TOT), 2), round(kurt(biblio$PATRIMONIO_TOT), 2), round(kurt(biblio$PINT_BEF), 2), 
+                round(kurt(biblio$PINT_AFT), 2), round(kurt(biblio$PEST_BEF), 2), round(kurt(biblio$PEST_AFT), 2), 
+                round(kurt(biblio$CONSUL_BEF), 2), round(kurt(biblio$CONSUL_AFT), 2), round(kurt(biblio$VOL_BEF), 2), 
+                round(kurt(biblio$TIRO_BEF), 2), "non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile",
+                "non calcolabile", "non calcolabile", "non calcolabile")
+sunto <- rbind(sunto, paste("kurt:", curtosi[]))
+
+skewness <- list("non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile", round(skew(biblio$OPENGG), 2), 
+                 round(skew(biblio$UTENTIATT_TOT), 2), round(skew(biblio$PATRIMONIO_TOT), 2), round(skew(biblio$PINT_BEF), 2), 
+                 round(skew(biblio$PINT_AFT), 2), round(skew(biblio$PEST_BEF), 2), round(skew(biblio$PEST_AFT), 2), 
+                 round(skew(biblio$CONSUL_BEF), 2), round(skew(biblio$CONSUL_AFT), 2), round(skew(biblio$VOL_BEF), 2), 
+                 round(skew(biblio$TIRO_BEF), 2), "non calcolabile", "non calcolabile", "non calcolabile", "non calcolabile",
+                 "non calcolabile", "non calcolabile", "non calcolabile")
+
+sunto <- rbind(sunto, paste("skew:", skewness[]))
+sunto <- as.table(sunto)
+sunto
+```
+
+Guardando i valori di deviazione standard e CV per alcune variabili quantitative, ci accorgiamo che ci sono dei valori sospetti. Per questo motivo vediamo la presenza di eventuali outliers mediante boxplot.
+
+## Variabile *PATRIMONIO_TOT*
+
+```{r}
+boxplot(biblio$PATRIMONIO_TOT, col="skyblue3", main="Patrimonio biblioteca (2020)")
+```
+
+Vediamo difatti la presenza di diversi outlier, ma potrebbe anche trattarsi di biblioteche con un patrimonio librario molto vasto. Per avere un’idea, cerco il record corrispondente al valore più alto:
+
+```{r}
+biblio[which.max(biblio$PATRIMONIO_TOT),]
+biblio[order(biblio$PATRIMONIO_TOT, decreasing = TRUE),]
+```
+
+Tale valore risulta relativo al record 816, una biblioteca in Toscana. Facendo una rapida ricerca in rete, dal sito dell’Anagrafe delle biblioteche italiane (https://anagrafe.iccu.sbn.it/it/open-data/) ho scaricato i dati relativi al patrimonio di ciascuna biblioteca e, facendo una ricerca incrociata del valore 10500000, risulta effettivamente relativo alla Biblioteca Nazionale Centrale di Firenze, pertanto possiamo assumere che tale valore sia corretto, visto che si tratta di una delle maggiori biblioteche sia a livello nazionale che europeo.
+
+```{r}
+istogr_patr <- hist(biblio$PATRIMONIO_TOT, main="Patrimonio librario totale (2020)",col="skyblue3", 
+               ylab="N° biblioteche", xlab="N° libri", breaks = 100, xlim = c(0, 13000000), ylim = c(0, 1400))
+
+text(istogr_patr$mids,istogr_patr$counts,labels=istogr_patr$counts, adj=c(0.5, -0.5))
+```
+
+Facendo l’istogramma vediamo che, sempre a causa del valore relativo al record 816, abbiamo una visibilità ridotta sulla distribuzione dei dati. Provando ad aumentare la granularità dell’istogramma (bin = 100) iniziamo a intravedere qualcosa, ma possiamo soltanto dire che si tratta di una distribuzione fortemente leptocurtica e con asimmetria positiva.
+
+```{r}
+qqPlot(biblio$PATRIMONIO_TOT)
+shapiro.test(biblio$PATRIMONIO_TOT)
+```
+
+Dal Q-Q plot vediamo che tale distribuzione non rispecchia quella di una normale (come confermato anche dall’esito del test di Shapiro-Wilk). Inoltre, sempre dal Q-Q plot troviamo conferma dell’elevato valore associato al record 816 che in qualche modo condiziona la distribuzione.
+
+## Variabile *OPENGG*
+
+Dalla *summary* vediamo che le biblioteche sono rimaste aperte per circa 132 giorni, con un valore mediano molto prossimo. Ci sono biblioteche che sono state chiuse del tutto e biblioteche aperte tutto l’anno (approfondendo quest’ultimo dato, ordinando in senso decrescente il dataset per giorni di apertura, vediamo che vi sono 3 biblioteche rimaste aperte 365 giorni su 365, con un numero di utenti pari rispettivamente a 0, 2 e 6 per tutto l’anno. Viene da pensare che tali informazioni sui giorni di apertura siano da prendere con le dovute precauzioni). Considerando invece il valore opposto, vediamo che ordinando in modo crescente troviamo 2 biblioteche che non hanno aperto per niente, tuttavia se vediamo la variabile *UTENTIATT_TOT* ci accorgiamo che per queste due biblioteche ci sono stati rispettivamente 50 e 8 utenti che nell’arco del 2020 hanno usufruito di almeno un servizio della biblioteca, quindi tali valori nulli sono da considerare molto probabilmente degli errori e/o omissioni.
+
+```{r}
+boxplot(biblio$OPENGG, col="skyblue3", main="Giorni di apertura (2020)")
+biblio[order(biblio$OPENGG, decreasing = TRUE),] # ordino i gg di apertura in maniera decrescente
+
+istogr_gg <- hist(biblio$OPENGG, main="Giorni di apertura (2020)",col="skyblue3", 
+                    ylab="N° biblioteche", xlab="Giorni apertura", breaks = 25, xlim = c(0, 400), ylim = c(0, 200))
+text(istogr_gg$mids,istogr_gg$counts,labels=istogr_gg$counts, adj=c(0.5, -0.5))
+```
+
+Facendo l’istogramma, inizialmente il numero di bin risulta troppo ridotto per apprezzare la distribuzione, pertanto ne ho aumentato la granularità: possiamo notare una bimodalità della distribuzione e un’asimmetria leggermente positiva. Questa leggere asimmetria potrebbe essere dovuta al fatto che durante il 2020, i giorni di chiusura sono aumentati a causa dei periodi di lockdown e dunque si ha una tendenza verso un numero minore di giorni di apertura. Tuttavia, per una conferma di quanto ipotizzato, bisognerebbe confrontare i dati del 2020 con quelli degli anni precedenti.
+
+```{r}
+qqPlot(biblio$OPENGG)
+```
+
+Dal Q-Q plot vediamo che solo una parte della porzione centrale rispecchia una distribuzione normale, perché le code e parzialmente qualcosa verso il centro si discostano dalla normalità. Si vedono inoltre dei punti isolati che si discostano ulteriormente, tra i quali spiccano le unità statistiche 11 e 30: se andiamo a vedere tali unità ci accorgiamo che corrispondono alle biblioteche che risultano aperte 365 giorni l’anno ma con, rispettivamente, 0 e 2 utenti attivi quindi questo forte contrasto spiegherebbe la posizione estrema di tali punti.
+
+```{r}
+shapiro.test(biblio$OPENGG)
+```
+
+Otteniamo un p-value di 2.299e-15, pertanto rigettiamo l’ipotesi di normalità (come già visto nel Q-Q plot d’altronde).
+
+**NOTA**: si vedono in tutte le variabili, eccetto OPENGG, alti valori del coefficiente di variazione dovuti alle forti variabilità che si riscontrano in particolare nel numero di personale e nel patrimonio librario, fattori questi che sono legati alla collocazione geografica della biblioteca e che pertanto offrono una forte variabilità in tutto il territorio nazionale.
+
+## Variabile *UTENTIATT_TOT*
+
+```{r}
+boxplot(biblio$UTENTIATT_TOT, col="skyblue3", main="Utenti attivi totali (2020)")
+```
+
+Dal boxplot vediamo che anche qui ci sono diversi valori potenzialmente anomali, di cui uno in particolare che però è relativo sempre al record 816. Trattandosi, come visto, di una delle maggiori biblioteche italiane, il numero potrebbe essere coerente.
+
+```{r}
+biblio[which.max(biblio$UTENTIATT_TOT),] # Identificazione del record 816
+```
+
+Facendo l’istogramma vediamo che, sempre a causa del valore relativo al record 816, abbiamo una visibilità ridotta sulla distribuzione dei dati. Provando ad aumentare la granularità dell’istogramma (bin = 100) iniziamo a intravedere qualcosa, ma possiamo soltanto dire che si tratta di una distribuzione fortemente leptocurtica e con asimmetria positiva.
+
+```{r}
+istogr_utenti <- hist(biblio$UTENTIATT_TOT, main="Utenti attivi - totale (2020)",col="skyblue3",
+                    ylab="N° biblioteche", xlab="N° utenti", breaks = 100, ylim = c(0, 1200))
+
+text(istogr_utenti$mids,istogr_utenti$counts,labels=istogr_utenti$counts, adj=c(0.5, -0.5))
+
+
+qqPlot(biblio$UTENTIATT_TOT)
+
+shapiro.test(biblio$UTENTIATT_TOT)
+```
+
+Dal Q-Q plot e dal test di Shapiro-Wilk troviamo conferma della non normalità della distribuzione.
+
+## Variabile *PINT_BEF* più altre variabili relative al personale
+
+Dal boxplot vediamo la presenza di diversi outliers, che sono comunque plausibili. Ad esempio il valore massimo (personale interno pari a 139) è relativo ad una biblioteca siciliana (utenti attivi = 20000), il secondo valore (p_int = 119) si ha per una biblioteca in Campania (utenti attivi = 20230) e il terzo (p_int = 115) per la biblioteca Nazionale a Firenze (utenti attivi = 20000).
+
+```{r}
+boxplot(biblio$PINT_BEF, col="skyblue3", main="Personale interno pre-Covid (2020)")
+biblio[which.max(biblio$PINT_BEF),]
+biblio[order(biblio$PINT_BEF, decreasing = TRUE),]
+biblio[which(biblio$PINT_BEF == 119),]
+biblio[which(biblio$PINT_BEF == 115),]
+
+istogr_pint <- hist(biblio$PINT_BEF, main="Personale interno pre-Covid (2020)",col="skyblue3",
+                      ylab="N° biblioteche", xlab="Personale interno")
+
+text(istogr_pint$mids,istogr_pint$counts,labels=istogr_pint$counts, adj=c(0.5, -0.5))
+```
+
+**NOTA**: dai numeri presenti per le variabili relative al personale possiamo dire di non avere outliers in quanto valori plausibili. I boxplot li usiamo rapidamente per verificare che non vi siano valori troppo estremi, ma fatto ciò per l’esplorazione di tali variabili useremo dei bar plot affiancati.
+
+```{r}
+boxplot(biblio$PINT_AFT, col="skyblue3", main="Personale interno post-Covid (2020)")
+boxplot(biblio$PEST_BEF, col="skyblue3", main="Personale esterno pre-Covid (2020)")
+boxplot(biblio$PEST_AFT, col="skyblue3", main="Personale esterno post-Covid (2020)")
+```
+
+Per ottenere i bar plot affiancati, faccio le seguenti operazioni preliminari:
+
+```{r}
+# interno
+total_pint_bef <- sum(biblio$PINT_BEF)
+total_pint_bef
+total_pint_aft <- sum(biblio$PINT_AFT)
+total_pint_aft
+
+# esterno
+total_pest_bef <- sum(biblio$PEST_BEF)
+total_pest_bef
+total_pest_aft <- sum(biblio$PEST_AFT)
+total_pest_aft
+
+# consulenti
+total_con_bef <- sum(biblio$CONSUL_BEF)
+total_con_bef
+total_con_aft <- sum(biblio$CONSUL_AFT)
+total_con_aft
+```
+
+**NOTA**: per i volontari non lo facciamo perché ci manca il dato relativo al post, idem per gli stagisti
+
+```{r}
+total.df <- data.frame("ANTE", "INTERNI", total_pint_bef)
+names(total.df) <- c("PERIODO", "TIPOLOGIA", "TOTALE")
+total.df[nrow(total.df) + 1,] <- c("POST", "INTERNI", total_pint_aft)
+total.df[nrow(total.df) + 1,] <- c("ANTE", "ESTERNI", total_pest_bef)
+total.df[nrow(total.df) + 1,] <- c("POST", "ESTERNI", total_pest_aft)
+total.df[nrow(total.df) + 1,] <- c("ANTE", "CONSULENTI", total_con_bef)
+total.df[nrow(total.df) + 1,] <- c("POST", "CONSULENTI", total_con_aft)
+
+total.df$TOTALE <- as.numeric(total.df$TOTALE)
+
+ggplot(total.df, aes(x = TIPOLOGIA, y = TOTALE, fill = PERIODO, colour = PERIODO)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_text(aes(label=TOTALE), fontface = "bold", colour = "black", vjust = -0.5, position = position_dodge(.9), size = 4) +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                     panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  theme(plot.title = element_text(color="black", size=14, face="bold", hjust = 0.5), axis.text.y=element_blank()) + 
+  ggtitle("Personale prima e dopo il lockdown")
+```
+
+Dai bar plot affiancati, possiamo vedere come il numero del personale è stato ridotto dal periodo pre-lockdown al dicembre 2020 (indicato sinteticamente come post), come d’altronde era da aspettarsi. Volendo calcolare la riduzione percentuale per le varie tipologie di personale:
+
+```{r}
+perc.int <- (total_pint_aft - total_pint_bef)/total_pint_bef*100
+perc.est <- (total_pest_aft - total_pest_bef)/total_pest_bef*100
+perc.con <- (total_con_aft - total_con_bef)/total_con_bef*100
+```
+
+Abbiamo quindi che tra il periodo antecedente al primo lockdown e la fine del 2020, c’è stata una riduzione pari a -8.15% per il personale interno, una riduzione del -2.7% per il personale esterno ed una riduzione del -6.76% per i consulenti.
+
+Passiamo ora alle variabili qualitative:
+
+## Variabile *REGIONE*
+
+```{r}
+# REGIONE
+count.reg <- summary(biblio$REGIONE)
+df.reg <- as.data.frame(count.reg)
+df.reg$Regioni <- row.names(df.reg)
+colnames(df.reg)[1] <- "n_biblio"
+
+ggplot(df.reg, aes(x = Regioni, y = n_biblio)) + geom_bar(stat = "identity", fill = "cadetblue3") + 
+  theme(plot.title = element_text(color="black", size=14, face="bold", hjust = 0.5), axis.text = element_text(angle = 90)) +
+  geom_text(aes(label=n_biblio), fontface = "bold", colour = "black", vjust = -0.5, position = position_dodge(.9), size = 4) +
+  ggtitle("Numero di biblioteche per regione")
+
+# TIPO
+tab <- table(biblio$TIPO)
+b <- barplot(tab, col = c("cyan3", "coral1"), ylim = c(0, 1000))
+text(x=b, y=tab/2, labels=tab)
+```
+
+Per quanto riguarda le regioni, vediamo che la regione con il più alto numero di biblioteche, relative al nostro dataset, è il Veneto. A una rapida occhiata, il numero di biblioteche sembra in qualche modo proporzionato alla dimensione della regione e/o al numero di abitanti (per un controllo più preciso bisognerebbe incrociare altri dati). Delle 1474 biblioteche presenti nel nostro dataset, 505 sono private e 969 sono pubbliche.
+
+# Principal component analysis - PCA
+
+Avendo già effettuato un minimo di analisi esplorativa sulle singole variabili, possiamo procedere verso la PCA. Innanzitutto, visto che utilizzeremo come variabili attive le variabili dalla 5 alla 15, e le variabili dalla 1 alla 4 come variabili illustrative qualitative, creiamo un sottoinsieme del dataset di partenza che le contiene e su cui effettueremo la PCA:
+
+```{r}
+biblio.rid <- biblio[, 1:15]
+biblio.rid
+```
+
+**NOTA**: siccome le variabili quantitative in esame hanno differenti unità di misura, è buona regola effettuare una standardizzazione, che nel nostro caso viene effettuata di default dalla funzione PCA di *FactoMineR*.
+
+```{r}
+biblio.pca <- PCA(biblio.rid, quali.sup = 1:4, graph = F)
+```
+
+Scegliamo innanzitutto le componenti principali, andando a vedere sia gli autovalori che la percentuale di inerzia associata a ciascuna componente principale:
+
+```{r}
+biblio.pca$eig
+summary(biblio.pca)
+```
+
+Dall’analisi degli autovalori abbiamo 4 autovalori > 1, quindi potremmo pensare di scegliere quattro componenti principali. Difatti, andando a vedere la percentuale di varianza spiegata associata a ciascuna componente, vediamo che utilizzando 4 componenti principali abbiamo un’inerzia totale di circa il 75%, mentre se ci fermassimo a due componenti avremmo un’inerzia totale soltanto del 52%. Optiamo quindi per la scelta di 4 componenti principali. Bisogna aggiungere che non c’è una grande percentuale di inerzia portata dalle varie componenti principali e soprattutto non c’è una componente principale predominante sulle altre: vuol dire quindi che anche guardando la prima componente non ci sarà una spiegazione così evidente della varianza del fenomeno latente nel dataset.
+
+Nuvola degli individui:
+
+```{r}
+plot.PCA(biblio.pca, invisible = c("var", "quali"), cex=0.7, axes = 1:2) # 1° e 2° componente principale
+plot.PCA(biblio.pca, invisible = c("var", "quali"), cex=0.7, axes = 3:4) # 3° e 4° componente principale
+plot.PCA(biblio.pca, invisible = c("var", "ind"), cex=0.7, axes = 1:2) # visualizzo le sole variabili supplementari
+plot.PCA(biblio.pca, invisible = c("var", "ind"), cex=0.7, axes = 3:4) # visualizzo le sole variabili supplementari
+```
+
+Cerchio delle correlazioni:
+
+```{r}
+plot(biblio.pca, choix = "var", axes = 1:2) # 1° e 2° componente principale
+plot(biblio.pca, choix = "var", axes = 3:4) # 3° e 4° componente principale
+```
+
+Studiamo ora i contributi contenuti nell’oggetto *biblio.pca*:
+
+```{r}
+biblio.pca$var$coord
+```
+
+A conferma di quanto visto nel cerchio delle correlazioni, possiamo vedere come la prima componente principale sia fortemente correlata alle variabili *PINT_BEF/AFT*, *UTENTIATT*, *PATRIMONIO*, *PEST_BEF/AFT*; la seconda componente alle variabili *CONSUL_BEF/AFT*, la terza è correlata negativamente alle variabili *PEST_BEF/AFT*. La quarta è correlata a *OPENGG* e negativamente a *VOL_BEF*.
+
+```{r}
+biblio.pca$var$contrib
+```
+
+Vediamo che per la prima componente principale le variabili che danno un maggiore contributo sono quelle relative al personale interno, ai giorni, al patrimonio e in maniera leggermente inferiore al personale esterno, come di fatto abbiamo già visto analizzando il coefficiente di correlazione lineare. Per la seconda, assumono un ruolo preponderante *CONS_BEF/AFT*, per la terza *PEST_BEF/AFT* e per la quarta *OPEN_GG* e *VOL_BEF*.
+
+```{r}
+biblio.pca$var$cos2
+```
+
+**NOTA**: cercando su internet maggiori informazioni relative alla categoria di personale esterno, ho trovato che tale categoria potrebbe comprendere, per esclusione, i soggetti che fanno servizio civile e gli studenti borsisti. Come si evince dalla tabella, riportata nel sito *https://www.aib.it/struttura/osservatorio-lavoro-e-professione/2013/34839-linee-indirizzo-personale-supporto-ai-bibliotecari/* , queste sono le uniche due categorie relative al personale esterno che prevedono un compenso. Tuttavia, se guardiamo la seconda componente, le variabili che contribuiscono maggiormente sono le due relative ai consulenti, che sono anche loro figure che prevedono un compenso. Evidentemente la distinzione riguarderà il fatto che il personale esterno, così come i borsisti e le persone del servizio civile sono in qualche modo vincolate da contratti pubblici di somministrazione, mentre i consulenti saranno professionisti provenienti da società private e dunque soggetti a condizioni differenti di reclutamento e differenti mansioni.
+
+Analisi della 1° componente principale: le variabili più fortemente correlate alla prima componente principale (sia dall’ispezione visiva del cerchio delle correlazioni, che dall’analisi dei contributi) risultano essere *PINT_BEF/AFT*, *PEST_BEF/AFT*, *UTENTIATTI*, *PATRIMONIO*, quindi tutte variabili legate in qualche modo all’esercizio della biblioteca. Difatti, guardando il grafico degli individui e analizzando i punti estremi per meglio comprendere il fenomeno sottostante, vediamo che la prima componente possiamo assimilarla all’attività di una biblioteca: in particolare, basandoci sull’analisi dei dati di alcuni dei punti che spiccano dalla nuvola vediamo che spostandoci lungo la prima componente principale da sinistra verso destra, aumenta il rapporto utenti/giorni di apertura. Ad esempio se prendiamo in considerazione gli individui 235 e 1083 che si trovano sulla sinistra abbiamo rispettivamente 15 e 1.9 come rapporto utenti/giorno, mentre se consideriamo gli individui 494 e 816 che si trovano sulla destra abbiamo rispettivamente 25 e 816 utenti/giorno.
+
+```{r}
+biblio[235,]
+biblio[1083,]
+biblio[494,]
+biblio[816,]
+```
+
+Naturalmente, visto che tale componente spiega circa il 36% della variabilità totale, avremo alcuni individui che pur trovandosi più a destra di altri, avranno un rapporto utenti/giorni inferiore, ma in linea di massima il trend è questo.
+
+Dando un’occhiata alla variabili illustrative qualitative, possiamo vedere come la Toscana sia la regione con un maggior numero di frequentazioni (probabilmente dovuto al fatto che Firenze è una città a forte vocazione di turismo culturale oltreché ospitare più o meno stabilmente studiosi che si recano lì espressamente per approfondimento —> una sorta di tappa obbligata per il “grand tour” odierno, soprattutto per gli anglosassoni). Va tuttavia sottolineato che sulla destra si trovano le regioni più grandi e popolose, quindi va da sé che tali regioni abbiano un’affluenza maggiore rispetto alle regioni meno popolose e “isolate” (es. Molise, Valle d’Aosta, etc.).
+
+**Analisi della 2° componente principale**: le variabili più fortemente correlate alla seconda componente principale (sia dall’ispezione visiva del cerchio delle correlazioni, che dall’analisi dei contributi) risultano essere principalmente CONSUL_BEF/AFT, in particolare i consulenti ingaggiati dopo il primo lockdown. Difatti vediamo che muovendoci dal basso verso l’alto lungo la seconda componente principale, abbiamo le biblioteche con pochi o nulli consulenti esterni (es. individui 497 e 1305 rispettivamente con 0 e 6 consulenti) e le biblioteche con un numero più consistente di consulenti esterni (es. individui 235 e 63 rispettivamente con 11 e 20 consulenti). Da notare che spostandosi contemporaneamente verso destra, a parità di ordinata il numero di consulenti diminuisce: quindi è come se le biblioteche che si trovano più a sinistra facessero più affidamento sui consulenti piuttosto che sul personale interno/esterno.
+
+Guardando le variabili illustrative qualitative vediamo che le biblioteche pubbliche si collocano perlopiù nella parte in basso a destra del piano, mentre quelle private in alto a sinistra: possiamo quindi supporre che nelle biblioteche pubbliche vi sia un maggior numero di dipendenti interni/esterni mentre in quelle private un maggior numero di consulenti. Inoltre, le biblioteche private sono quelle relative ai servizi specializzati, le quali si trovano nella maggior parte dei casi al Centro-Sud. Vediamo invece che le biblioteche che offrono servizi di pubblica lettura e conservazione sono collocate perlopiù al Centro-Nord.
+
+Riprendendo i comandi per visualizzare la nuvola di individui e il cerchio delle correlazioni per la terza e la quarta componente principale:
+
+```{r}
+plot.PCA(biblio.pca, invisible = c("var", "quali"), cex=0.7, axes = 3:4) # 3° e 4° componente principale
+plot.PCA(biblio.pca, invisible = c("var", "ind"), cex=0.7, axes = 3:4) # visualizzo le sole variabili supplementari
+
+plot(biblio.pca, choix = "var", axes = 3:4) # 3° e 4° componente principale
+```
+
+**Analisi della 3° componente principale**: le variabili più fortemente correlate, stavolta negativamente, alla terza componente principale (sia dall’ispezione visiva del cerchio delle correlazioni, che dall’analisi dei contributi) risultano essere *PEST_BEF/AFT*. Se consideriamo il rapporto personale esterno/personale interno vediamo difatti che, andando da sinistra verso destra lungo la terza componente, abbiamo man mano una diminuzione di questo rapporto: ad es. considerando l’individuo 494 sull’estrema sinistra abbiamo un valore di circa 2.6, mentre se prendiamo gli individui 697 e 218 abbiamo rispettivamente 1.63 e 0.48, fino ad arrivare ai quadranti 1-3 in cui abbiamo gli individui 63, 535 e 750 con 0 personale esterno. Guardando le variabili supplementari qualitative, fondamentalmente possiamo dire che la terza componente è relativa alla tipologia di biblioteca: difatti spaziamo dalla biblioteca pubblica in cui si effettua la pubblica lettura (sinistra) fino alla biblioteca privata in cui si effettua sostanzialmente conservazione (sulla destra), passando per i vari servizi offerti. Se incrociamo quest’ultima informazione derivante dall’analisi delle variabili supplementari con quanto visto dalle variabili attive, possiamo vedere infatti come nelle biblioteche pubbliche con funzioni di pubblica consultazione, si ricorra maggiormente a personale esterno rispetto a quelle private, con funzione di conservazione.
+
+```{r}
+biblio[494,]
+biblio[697,]
+biblio[218,]
+biblio[63,]
+biblio[535,]
+biblio[750,]
+```
+
+**Analisi della 4° componente principale**: dai contributi e dal cerchio delle correlazioni vediamo che le variabili più correlate con la quarta componente sono i giorni di apertura (correlata positivamente) e il numero di volontari prima del lockdown (correlata negativamente). Aiutandoci con il grafico delle variabili supplementari, vediamo che in basso troviamo il Molise e in alto la Valle d’Aosta (confrontiamo queste due regioni in quanto hanno entrambe lo stesso numero di biblioteche nel dataset, pari a 2) e calcolando il numero totale di giorni di apertura vediamo che infatti la Valle d’Aosta è rimasta aperta per 294 giorni mentre il Molise per 120 giorni. Inoltre, concentrandoci sul numero di volontari di due regioni numericamente comparabili dal punto di vista delle biblioteche (Trentino 27 e Calabria 22), vediamo che in Trentino il numero totale di volontari è pari a 9 mentre in Calabria è pari a 87. Questo vuol dire che, fatta eccezione per la Sicilia, il numero di volontari è più alto nelle regioni del Sud rispetto alle regioni del Nord, che potrebbe anche interpretarsi come una minore attenzione di queste regioni (e conseguentemente di fondi stanziati) verso attività socio-culturali come le biblioteche, il che si traduce naturalmente in un numero inferiore di giorni di apertura al pubblico.
+
+Di seguito alcuni comandi ausiliari utilizzati per l’analisi della quarta componente principale:
+
+```{r}
+biblio.calabria <- filter(biblio, REGIONE == "Calabria")
+biblio.molise <- filter(biblio, REGIONE == "Molise")
+biblio.valaosta <- filter(biblio, REGIONE == "Valle_Aosta")
+biblio.sicilia <- filter(biblio, REGIONE == "Sicilia")
+biblio.trentino <- filter(biblio, REGIONE == "Trentino_Alto_Adige")
+gg.valaosta <- sum(biblio.valaosta$OPENGG)
+gg.molise <- sum(biblio.molise$OPENGG)
+gg.trentino <- sum(biblio.trentino$OPENGG)
+gg.calabria <- sum(biblio.calabria$OPENGG)
+vol.valaosta <- sum(biblio.valaosta$VOL_BEF)
+vol.molise <- sum(biblio.molise$VOL_BEF)
+vol.calabria <- sum(biblio.calabria$VOL_BEF)
+vol.sicilia <- sum(biblio.sicilia$VOL_BEF)
+vol.trentino <- sum(biblio.trentino$VOL_BEF)
+n.biblio.valaosta <- count(biblio.valaosta)
+n.biblio.molise <- count(biblio.molise)
+n.biblio.calabria <- count(biblio.calabria)
+n.biblio.sicilia <- count(biblio.sicilia)
+n.biblio.trentino <- count(biblio.trentino)
+```
+
+# Multiple correspondence analysis - MCA
+
+Creiamo per comodità una versione ridotta del dataset iniziale, contenete esclusivamente le variabili che andremo ad utilizzare nell’analisi:
+
+```{r}
+biblio.rid2 <- biblio[, -c(5, 6, 8:15)]
+
+summary(biblio.rid2)
+
+biblio.mca <- MCA(biblio.rid2, quanti.sup = 5, quali.sup = c(1:4))
+```
+
+Diamo un’occhiata agli autovalori:
+
+```{r}
+biblio.mca$eig
+```
+
+Vediamo che considerando le prime tre componenti principali abbiamo una varianza spiegata di circa il 66%.
+
+Concentrandoci sui primi due assi principali, vediamo di fornirne un’interpretazione mediante l’ausilio del seguente grafico:
+
+```{r}
+plot.MCA(biblio.mca, invisible = c("ind", "quali.sup"), cex = 0.7)
+```
+
+Questo grafico è la rappresentazione delle modalità delle variabili che abbiamo considerato come attive, sul piano costituito dalle prime due componenti principali.
+
+**Analisi della 1° componente principale**: possiamo innanzitutto vedere come esista una netta linea di demarcazione relativa alla presenza (lato destro) e assenza (lato sinistro) dei nuovi servizi post-lockdown. Vista la vicinanza delle modalità *ACCESSO_AFT* e *SOCIAL_AFT*, possiamo supporre che biblioteche che incrementano l’uso dei social media tendano anche ad attivare l’accesso gratuito al materiale digitalizzato, e viceversa. Seguendo lo stesso ragionamento, possiamo supporre che biblioteche che puntano ad una forte presenza on line (tramite conferenze, incontri, etc.) non offrano prestiti in modalità take away. Dalla nuvola di punti vediamo inoltre che le biblioteche che non hanno attivato nuovi servizi sono costituite da una distribuzione più compatta, mentre quelle che hanno provveduto ad attivare nuovi servizi hanno una maggiore variabilità, in quanto la nuvola è più “esplosa”.
+
+```{r}
+plot.MCA(biblio.mca, invisible = c("ind", "var"), cex = 0.7)
+```
+
+Guardando le variabili supplementari, e alla luce di quanto detto per la prima componente, possiamo dire che l’attivazione dei nuovi servizi digitali si è verificata soprattutto nel Nord-Est (Friuli e Veneto), in particolare nelle biblioteche pubbliche.
+
+```{r}
+biblio.mca$var$coord
+```
+
+Dalle coordinate dei punti sul piano, troviamo conferma che l’attivazione dei nuovi servizi si trova lungo il semiasse positivo della prima componente principale, mentre la non attivazione di tali servizi sta sul semiasse negativo.
+
+**Analisi della 2° componente principale**: analizzando sia la nuvola dei punti che i contributi possiamo dire che la seconda componente è relativa alla presenza o meno della biblioteca sul web, quindi possiamo interpretarla come una sorta di tasso di “socialità” di quella biblioteca e di conseguenza quanto è attenta a crearsi una fidelizzazione nel pubblico tramite gli eventi. Aiutandoci con le variabili supplementari vediamo difatti che le biblioteche con una maggiore attenzione alla creazione di un’immagine e di un rapporto con il pubblico sono le biblioteche private e specialistiche, collocate perlopiù nel Centro-Nord della penisola. Inoltre, vista la contrapposizione tra le modalità *ONLINE_AFT* e *PRESTITO_AFT*, troviamo conferma del fatto che le biblioteche che sono più attente ad avere una maggiore presenza on line, tendano ad offrire meno prestiti in modalità take away.
+
+Per la variabile quantitativa *PATRIMONIO_TOT* andiamo a vedere il cerchio delle correlazioni: dalle dimensioni della freccia vediamo che tale variabile non ha un’influenza molto forte e senza preponderanza su un asse in particolare (vista la sua equidistanza dai due assi principali). Vista la tendenza della freccia verso l’alto, possiamo comunque dire che, in minima parte, l’attivazione dei nuovi servizi è stata avviata su quelle biblioteche con un patrimonio librario più o meno consistente.
+
+# Analisi dei gruppi tramite coordinate fattoriali
+
+**NOTA**: la seguente porzione di codice non viene eseguita in quanto, se l’utente non sceglie il punto in cui tagliare il dendrogramma, viene restituito un errore (in particolare: *Error in while (coupe\(y < min(t\)tree$height)) argument is of length zero*).
+
+```{r}
+#biblio.cl <- HCPC(biblio.mca) # Analisi dei gruppi di tipo gerarchico
+
+#biblio.cl$desc.var
+```
+
+Per accompagnare l’analisi con un grafico, inserisco nel notebook direttamente l’immagine che viene fuori dall’analisi dei gruppi di tipo gerarchico:
+
+![](C:\Users\Luca\Documents\R\Progetto\biblio_cluster.jpeg)
+
+Tagliando il dendrogramma nel punto suggerito dall’algoritmo abbiamo 3 cluster. Per la caratterizzazione di ognuno di essi, andremo a scegliere quelle modalità il cui valore di test è maggiore di 2.
+
+**GRUPPO 1**: le modalità che caratterizzano maggiormente questo gruppo fanno sì che in tale gruppo vi siano le biblioteche che non hanno attivato alcun servizio dopo il lockdown, con lieve preponderanze di quelle private e specialistiche, localizzate perlopiù nel Sud Italia.
+
+**GRUPPO 2**: in questo gruppo abbiamo le biblioteche che hanno puntato sulla digitalizzazione e sull’accesso dei loro contenuti. Tali biblioteche sono in genere private e specialistiche, localizzate nelle due regioni più importanti dal punto di vista politico (Lazio) ed economico (Lombardia), probabilmente per permettere ai lavoratori del settore di poter continuare il loro lavoro durante i mesi di pandemia.
+
+**GRUPPO 3**: abbiamo le biblioteche più attive dal punto di vista social e dell’attenzione verso la comunità dei lettori, visto che sono quelle che hanno maggiormente organizzato attività di laboratorio e di conferenze on line. Tali biblioteche sono perlopiù pubbliche e multidisciplinari, localizzate per la maggior parte nel Veneto (che dall’analisi monovariata abbiamo visto essere la regione con il più alto numero di biblioteche).
+
+
+
+
